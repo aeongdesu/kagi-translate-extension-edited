@@ -1,8 +1,4 @@
 name: Build patched extension
-
-# Manual only. Provide the download link of the original Chrome extension (.crx or .zip); the
-# runner downloads it, formats it, applies patches/*.patch, adds overlay/ and uploads the result
-# as an artifact. Nothing from the original extension is stored in this repository.
 on:
   workflow_dispatch:
     inputs:
@@ -15,18 +11,16 @@ permissions:
   contents: read
 
 env:
-  # Patches are written against the output of this exact Prettier version. Do not change it
-  # without regenerating the patches.
+  # Patches are written against the output of this exact Prettier version. Do not change it without regenerating the patches.
   PRETTIER_VERSION: 3.9.9
 
 jobs:
   build:
-    runs-on: ubuntu-latest
-    timeout-minutes: 10
+    runs-on: ubuntu-slim
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v7
 
-      - uses: actions/setup-node@v4
+      - uses: actions/setup-node@v6
         with:
           node-version: 22
 
@@ -112,9 +106,7 @@ jobs:
         id: version
         run: echo "value=$(node -p "require(process.env.RUNNER_TEMP + '/work/dist/manifest.json').version")" >> "$GITHUB_OUTPUT"
 
-      - uses: actions/upload-artifact@v4
+      - uses: actions/upload-artifact@v7
         with:
           name: kagi-translate-apikey-${{ steps.version.outputs.value }}
           path: ${{ runner.temp }}/work/dist
-          if-no-files-found: error
-          retention-days: 14
