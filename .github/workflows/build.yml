@@ -27,7 +27,7 @@ jobs:
       - name: Download original extension
         run: |
           set -euo pipefail
-          [[ ${{ inputs.url }} == https://* ]] || { echo "::error::The link must start with https://"; exit 1; }
+          [[ "${{ inputs.url }}" == https://* ]] || { echo "::error::The link must start with https://"; exit 1; }
           mkdir -p "$RUNNER_TEMP/work"
           curl -fsSL --max-time 120 -o "$RUNNER_TEMP/work/kagi.crx" -- "${{ inputs.url }}"
 
