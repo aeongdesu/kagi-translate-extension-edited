@@ -1,0 +1,120 @@
+name: Build patched extension
+
+# Manual only. Provide the download link of the original Chrome extension (.crx or .zip); the
+# runner downloads it, formats it, applies patches/*.patch, adds overlay/ and uploads the result
+# as an artifact. Nothing from the original extension is stored in this repository.
+on:
+  workflow_dispatch:
+    inputs:
+      url:
+        description: "Direct https:// download link of the original Chrome extension (.crx or .zip)"
+        required: true
+        type: string
+
+permissions:
+  contents: read
+
+env:
+  # Patches are written against the output of this exact Prettier version. Do not change it
+  # without regenerating the patches.
+  PRETTIER_VERSION: 3.9.9
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+
+      - name: Download original extension
+        env:
+          # Passed through the environment, never interpolated into the script.
+          UPSTREAM_URL: ${{ inputs.url }}
+        run: |
+          set -euo pipefail
+          case "$UPSTREAM_URL" in
+            https://*) ;;
+            *) echo "::error::The link must start with https://"; exit 1 ;;
+          esac
+          mkdir -p "$RUNNER_TEMP/work"
+          curl -fsSL --max-time 120 --max-filesize 52428800 -o "$RUNNER_TEMP/work/upstream.bin" -- "$UPSTREAM_URL"
+
+      - name: Unpack
+        run: |
+          set -euo pipefail
+          python3 - <<'PY'
+          import io, json, os, pathlib, struct, sys, zipfile
+
+          work = pathlib.Path(os.environ["RUNNER_TEMP"]) / "work"
+          base = work / "base"
+          data = (work / "upstream.bin").read_bytes()
+
+          # CRX3 layout: "Cr24" | version (u32) | header length (u32) | header | zip
+          if data[:4] == b"Cr24":
+              version, header_len = struct.unpack("<II", data[4:12])
+              if version != 3:
+                  sys.exit("Unsupported CRX version (expected CRX3)")
+              data = data[12 + header_len:]
+          try:
+              z = zipfile.ZipFile(io.BytesIO(data))
+          except zipfile.BadZipFile:
+              sys.exit("The file is not a valid .crx/.zip archive (did the link return an HTML page?)")
+
+          manifest = json.loads(z.read("manifest.json"))
+          if manifest.get("name") != "Kagi Translate" or manifest.get("manifest_version") != 3:
+              sys.exit(f"Unexpected extension: {manifest.get('name')!r} (manifest v{manifest.get('manifest_version')}); expected the Chrome (MV3) build of Kagi Translate")
+
+          for info in z.infolist():
+              # _metadata only holds the Web Store's signature data, which is invalid once files change.
+              if info.is_dir() or info.filename.split("/")[0] == "_metadata":
+                  continue
+              dest = (base / info.filename).resolve()
+              if base.resolve() not in dest.parents:
+                  sys.exit(f"Unsafe path in archive: {info.filename}")
+              dest.parent.mkdir(parents=True, exist_ok=True)
+              dest.write_bytes(z.read(info))
+          print(f"Unpacked Kagi Translate {manifest['version']}")
+          PY
+
+      # Formatting makes the minified bundles diffable, and it is deterministic, so patch context is stable.
+      - name: Format
+        run: |
+          set -euo pipefail
+          cd "$RUNNER_TEMP/work"
+          find base -name '*.js' -print0 | xargs -0 npx --yes "prettier@$PRETTIER_VERSION" --parser babel --write --log-level warn
+
+      - name: Apply patches and overlay
+        run: |
+          set -euo pipefail
+          cd "$RUNNER_TEMP/work"
+          cp -r base dist
+          cd dist
+          for patch in "$GITHUB_WORKSPACE"/patches/*.patch; do
+            git apply --whitespace=nowarn "$patch"
+            # Guard against a silent no-op: the patch must now be fully present.
+            git apply --reverse --check "$patch"
+            echo "applied $(basename "$patch")"
+          done
+          cp -r "$GITHUB_WORKSPACE"/overlay/. .
+
+      - name: Check syntax
+        run: |
+          set -euo pipefail
+          cd "$RUNNER_TEMP/work/dist"
+          find . -name '*.js' -not -path './_locales/*' -print0 | xargs -0 -n1 node --check
+          node -e "JSON.parse(require('fs').readFileSync('manifest.json','utf8'))"
+
+      - name: Read version
+        id: version
+        run: echo "value=$(node -p "require(process.env.RUNNER_TEMP + '/work/dist/manifest.json').version")" >> "$GITHUB_OUTPUT"
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: kagi-translate-apikey-${{ steps.version.outputs.value }}
+          path: ${{ runner.temp }}/work/dist
+          if-no-files-found: error
+          retention-days: 14

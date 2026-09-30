@@ -1,0 +1,134 @@
+diff --git a/background.js b/background.js
+index 1b5cd0c..871014a 100644
+--- a/background.js
++++ b/background.js
+@@ -615,9 +615,50 @@ var background = (function () {
+     pt = new Set();
+   let Zt = !1,
+     G = null;
++  const kxApiKeyName = "kagi_api_key",
++    kxAuthModeName = "kagi_auth_mode",
++    kxApiHost = "translate.kagi.com";
++  async function kxGetApiKey() {
++    try {
++      const e = await f.storage.local.get([kxApiKeyName, kxAuthModeName]),
++        t = typeof e[kxApiKeyName] == "string" ? e[kxApiKeyName].trim() : "";
++      return e[kxAuthModeName] === "api_key" && t ? t : null;
++    } catch (e) {
++      return (u.error("auth", "Error reading API key:", e), null);
++    }
++  }
++  function kxIsApiHost(e) {
++    try {
++      const t = new URL(e);
++      return t.protocol === "https:" && t.hostname === kxApiHost;
++    } catch {
++      return !1;
++    }
++  }
++  async function kxApiKeySession(e) {
++    G = null;
++    const t = await Et(`${V}/api/auth`, {
++      method: "GET",
++      headers: {
++        "Content-Type": "application/json",
++        Authorization: `Bearer ${e}`,
++        ...B(),
++      },
++      credentials: "omit",
++    });
++    if (t.status === 401 || t.status === 403)
++      return (u.debug("auth", "API key rejected by server"), null);
++    if (!t.ok) throw new Error(`HTTP ${t.status}`);
++    const n = await t.json();
++    // API accounts get a placeholder token from the server; without an id/token the settings
++    // sync stays off instead of calling /api/sync with an unusable token.
++    return n && n.loggedIn === !0 ? { ...n, id: null, token: null } : null;
++  }
+   async function bt() {
+     var t;
+-    return G || (((t = (await Jt())[0]) == null ? void 0 : t.value) ?? null);
++    return (await kxGetApiKey())
++      ? null
++      : G || (((t = (await Jt())[0]) == null ? void 0 : t.value) ?? null);
+   }
+   function pn() {
+     return (
+@@ -723,7 +764,15 @@ var background = (function () {
+     return fetch(e, { ...t, headers: a });
+   }
+   async function F(e, t = {}) {
+-    const n = await bt(),
++    const k = await kxGetApiKey();
++    if (k && kxIsApiHost(e)) {
++      const r = new Headers(t.headers);
++      return (
++        r.set("Authorization", `Bearer ${k}`),
++        Et(e, { ...t, headers: r, credentials: "omit" })
++      );
++    }
++    const n = k ? null : await bt(),
+       a = _t(e, t, n);
+     return Et(a.url, a.options);
+   }
+@@ -737,6 +786,8 @@ var background = (function () {
+       ? { session: e.session, fromCache: !0 }
+       : {
+           session: await St.load(async () => {
++            const k = await kxGetApiKey();
++            if (k) return kxApiKeySession(k);
+             const n = await Jt();
+             if (n.length === 0) return ((G = null), null);
+             for (const a of n) {
+@@ -787,7 +838,7 @@ var background = (function () {
+       ((Zt = !0),
+       f.storage.onChanged.addListener((n, a) => {
+         a === "local" &&
+-          n.kagi_manual_session_token &&
++          (n.kagi_manual_session_token || n[kxApiKeyName] || n[kxAuthModeName]) &&
+           At("manual-token-change");
+       }),
+       (t = (e = f.cookies) == null ? void 0 : e.onChanged) == null ||
+@@ -801,7 +852,7 @@ var background = (function () {
+       const n = await bn(),
+         r = (await f.storage.local.get("kagi_manual_session_token"))
+           .kagi_manual_session_token;
+-      if (!n && !r) {
++      if (!n && !r && !(await kxGetApiKey())) {
+         u.info("auth", "User not logged in, showing auth toast");
+         try {
+           await f.tabs.sendMessage(
+@@ -903,6 +954,11 @@ var background = (function () {
+           title: T.t("context_menu_read_aloud_page"),
+           contexts: ["page"],
+         })),
++      f.contextMenus.create({
++        id: "kagi-api-key-settings",
++        title: "API key settings",
++        contexts: [f.action ? "action" : "browser_action"],
++      }),
+       u.debug("state", "Context menus initialized", {
+         enableTextMenu: t,
+         enablePageMenu: n,
+@@ -913,6 +969,8 @@ var background = (function () {
+   }
+   function In() {
+     (f.contextMenus.onClicked.addListener((e, t) => {
++      if (e.menuItemId === "kagi-api-key-settings")
++        return void f.tabs.create({ url: f.runtime.getURL("api-key.html") });
+       if (!(t != null && t.id)) return;
+       const n = e.frameId ?? 0;
+       switch (e.menuItemId) {
+@@ -2568,9 +2626,9 @@ var background = (function () {
+         }
+         if (t.type === "check_kagi_cookie")
+           return (
+-            bt()
+-              .then((o) => {
+-                a({ hasCookie: !!o });
++            Promise.all([bt(), kxGetApiKey()])
++              .then(([o, k]) => {
++                a({ hasCookie: !!o || !!k });
+               })
+               .catch((o) => {
+                 (u.error("auth", "Error checking for kagi_session cookie:", o),
