@@ -1,0 +1,184 @@
+diff --git a/content-scripts/content.js b/content-scripts/content.js
+index 6a0a528..dafb644 100644
+--- a/content-scripts/content.js
++++ b/content-scripts/content.js
+@@ -670,7 +670,8 @@ var content = (function () {
+     ],
+     mt = "kagi_translate_enable_kagi_translate_redirect",
+     Ot = "kagi_translate_custom_integrations",
+-    Re = [...ye, mt, Ot],
++    kxRedlibKey = "kagi_redlib_domains",
++    Re = [...ye, mt, Ot, kxRedlibKey],
+     Lt = "data-kagi-translate-roundcube-global",
+     vt = "kagi-translate-roundcube-probe-found",
+     Ie = "kagi-translate-roundcube-probe-stop",
+@@ -905,9 +906,14 @@ var content = (function () {
+         ? "kagi_translate_bluesky_integration"
+         : (((e = Ye.find(([n]) => it(t, n))) == null ? void 0 : e[1]) ?? null);
+   }
++  // Redlib is self-hosted, so its hosts come from a user-maintained list (overlay/extra-settings.html).
++  function kxIsRedlib(t, e) {
++    return Array.isArray(e) && e.some((n) => typeof n == "string" && Pt(t, n));
++  }
+   function je(t, e, n) {
+-    const o = Ke(t);
+-    if (!o || (n && !it(t, qe))) return !1;
++    const kx = kxIsRedlib(t, e[kxRedlibKey]),
++      o = kx ? "kagi_translate_reddit_integration" : Ke(t);
++    if (!o || (n && !kx && !it(t, qe))) return !1;
+     if (o === mt) {
+       const r = e[o];
+       return r === void 0 || r === "true";
+diff --git a/content-scripts/site-features.js b/content-scripts/site-features.js
+index a47b291..a57a807 100644
+--- a/content-scripts/site-features.js
++++ b/content-scripts/site-features.js
+@@ -39827,6 +39827,7 @@ ${f.join(`
+               ye.trim() &&
+               L.push({ element: Z, type: "comment", depth: z, index: j++ });
+         }),
++        kxRedlibCollect(L),
+         L
+       );
+     }
+@@ -40460,6 +40461,104 @@ ${f.join(`
+       }
+     }
+   }
++  function kxIsRedlib(t, e) {
++    return Array.isArray(e) && e.some((n) => typeof n == "string" && Jn(t, n));
++  }
++  function kxRedlibPost() {
++    const t = document.querySelector("#post_links");
++    return t ? t.closest(".post") : null;
++  }
++  // .post is a grid with named areas, so the panel needs a full-width row of its own. The panel
++  // host cannot be styled from the page (its shadow root resets it with !important), hence the
++  // wrapper.
++  function kxRedlibPanel() {
++    const t = kxRedlibPost();
++    if (!t) return null;
++    let e = t.querySelector(":scope > [data-kagi-redlib-panel]");
++    return (
++      e ||
++        ((e = document.createElement("div")),
++        e.setAttribute("data-kagi-redlib-panel", ""),
++        (e.style.gridColumn = "1 / -1"),
++        t.appendChild(e)),
++      e
++    );
++  }
++  function kxRedlibButton() {
++    const t = kxRedlibPost();
++    if (!t) {
++      g.debug("int-reddit", "No Redlib post found");
++      return;
++    }
++    const e = t.querySelector("#post_links");
++    if (e.querySelector("[data-kagi-reddit-translate]")) return;
++    const n = `reddit-redlib-btn-${Date.now()}-${Math.random().toString(36).substring(2, 10)}`,
++      r = document.createElement("li");
++    r.setAttribute("data-kagi-reddit-translate", "true");
++    const o = document.createElement("a");
++    (o.setAttribute("data-button-id", n),
++      (o.style.cursor = "pointer"),
++      yn(o, "reddit"),
++      (o.innerHTML = `<svg width="14" height="14" viewBox="0 0 32 32" style="vertical-align: baseline; position: relative; top: 2px;">${$c()}</svg> <span>${be.t("translate")}</span>`),
++      o.addEventListener("click", (a) => {
++        (a.preventDefault(),
++          a.stopPropagation(),
++          g.debug("int-reddit", "Redlib translate button clicked"),
++          D.runtime.sendMessage({
++            action: "translateRedditPage",
++            buttonId: n,
++          }));
++      }),
++      r.appendChild(o),
++      e.appendChild(r),
++      g.info("int-reddit", "Redlib translate button injected"));
++  }
++  function kxRedlibTitle(t) {
++    const e = t.querySelector(".post_title");
++    if (!e) return null;
++    const n = e.querySelector("[data-kagi-redlib-title]");
++    if (n) return n;
++    if (e.childElementCount === 0) return e;
++    // The title shares its <h1> with the flair link, so only the text itself gets wrapped.
++    const r = Array.from(e.childNodes)
++      .filter((a) => a.nodeType === 3 && a.textContent.trim())
++      .sort((a, s) => s.textContent.length - a.textContent.length)[0];
++    if (!r) return null;
++    const o = document.createElement("span");
++    return (
++      o.setAttribute("data-kagi-redlib-title", ""),
++      e.insertBefore(o, r),
++      o.appendChild(r),
++      o
++    );
++  }
++  function kxRedlibCollect(t) {
++    const e = kxRedlibPost();
++    if (!e) return;
++    const n = (o, a, s) => {
++        const i = o.querySelectorAll("p");
++        i.length > 0
++          ? i.forEach((l) => {
++              t.push({ element: l, type: a, depth: s, index: t.length });
++            })
++          : o.textContent &&
++            o.textContent.trim() &&
++            t.push({ element: o, type: a, depth: s, index: t.length });
++      },
++      r = kxRedlibTitle(e);
++    (r && t.push({ element: r, type: "title", depth: 0, index: t.length }),
++      e.querySelectorAll(".post_body .md").forEach((o) => n(o, "body", 0)),
++      document.querySelectorAll(".comment_body .md").forEach((o) => {
++        let a = 0,
++          s = o.closest(".comment");
++        for (
++          ;
++          s && s.parentElement && (s = s.parentElement.closest(".comment"));
++        )
++          a++;
++        n(o, "comment", a);
++      }));
++  }
+   function n4() {
+     (g.info("int-reddit", "Initializing Reddit integration"),
+       jt(() => {
+@@ -40537,7 +40636,7 @@ ${f.join(`
+       return;
+     }
+     if (!document.querySelector(".title.may-blank")) {
+-      g.debug("int-reddit", "No old Reddit title found");
++      (g.debug("int-reddit", "No old Reddit title found"), kxRedlibButton());
+       return;
+     }
+     const e =
+@@ -41002,7 +41101,7 @@ ${f.join(`
+     const e = document.querySelector("shreddit-post");
+     if (e) return e;
+     const n = document.querySelector(".thing.link");
+-    return n || document.body;
++    return n || kxRedlibPanel() || document.body;
+   }
+   function v4(t, e, n, r) {
+     if (
+@@ -41500,7 +41599,7 @@ ${f.join(`
+       rr("kagi-redirect", k4);
+       return;
+     }
+-    const n = await D.storage.local.get([...P4]),
++    const n = await D.storage.local.get([...P4, "kagi_redlib_domains"]),
+       {
+         kagi_translate_bluesky_integration: r,
+         kagi_translate_twitter_integration: o,
+@@ -41592,7 +41691,7 @@ ${f.join(`
+           "Telegram Web detected, initializing Telegram integration",
+         ),
+         rr("telegram", NI)),
+-      Jn(t, "reddit.com") &&
++      (Jn(t, "reddit.com") || kxIsRedlib(t, n.kagi_redlib_domains)) &&
+         f !== "false" &&
+         (g.info("trans", "Reddit detected, initializing Reddit integration"),
+         rr("reddit", n4)),

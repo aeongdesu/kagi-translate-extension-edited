@@ -103,8 +103,8 @@ index 1b5cd0c..871014a 100644
            contexts: ["page"],
          })),
 +      f.contextMenus.create({
-+        id: "kagi-api-key-settings",
-+        title: "API key settings",
++        id: "kagi-extra-settings",
++        title: "Extra settings",
 +        contexts: [f.action ? "action" : "browser_action"],
 +      }),
        u.debug("state", "Context menus initialized", {
@@ -114,8 +114,8 @@ index 1b5cd0c..871014a 100644
    }
    function In() {
      (f.contextMenus.onClicked.addListener((e, t) => {
-+      if (e.menuItemId === "kagi-api-key-settings")
-+        return void f.tabs.create({ url: f.runtime.getURL("api-key.html") });
++      if (e.menuItemId === "kagi-extra-settings")
++        return void f.tabs.create({ url: f.runtime.getURL("extra-settings.html") });
        if (!(t != null && t.id)) return;
        const n = e.frameId ?? 0;
        switch (e.menuItemId) {

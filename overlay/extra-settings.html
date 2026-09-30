@@ -3,7 +3,7 @@
   <head>
     <meta charset="utf-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1" />
-    <title>Kagi Translate – API key</title>
+    <title>Kagi Translate – extra settings</title>
     <style>
       :root { color-scheme: light dark; --bg: #fff; --fg: #1c1c1e; --muted: #6b6b70; --line: #d8d8dc; --accent: #ffb319; --ok: #1a7f37; --err: #cf222e; }
       @media (prefers-color-scheme: dark) { :root { --bg: #232325; --fg: #f2f2f4; --muted: #a0a0a8; --line: #3a3a3e; --ok: #56d364; --err: #ff7b72; } }
@@ -17,13 +17,17 @@
       .buttons { display: flex; gap: 8px; flex-wrap: wrap; margin-top: 12px; }
       button { padding: 8px 14px; border-radius: 10px; border: 1px solid var(--line); background: transparent; color: inherit; font: inherit; cursor: pointer; }
       button.primary { background: var(--accent); border-color: var(--accent); color: #000; }
-      #status { margin-top: 16px; min-height: 1.5em; }
-      #status.ok { color: var(--ok); } #status.err { color: var(--err); }
+      .status { margin-top: 16px; min-height: 1.5em; }
+      .status.ok { color: var(--ok); } .status.err { color: var(--err); }
+      hr { border: 0; border-top: 1px solid var(--line); margin: 32px 0 24px; }
+      h2 { font-size: 17px; margin: 0 0 4px; }
+      label.field { display: block; margin: 16px 0 6px; }
     </style>
   </head>
   <body>
     <main>
       <h1 id="title"></h1>
+      <h2 id="apiTitle"></h2>
       <p class="muted" id="intro"></p>
       <label class="row"><input type="checkbox" id="enabled" /><span id="enabledLabel"></span></label>
       <label for="key" id="keyLabel"></label>
@@ -34,8 +38,17 @@
         <button id="check"></button>
         <button id="clear"></button>
       </div>
-      <div id="status" role="status" aria-live="polite"></div>
+      <div id="status" class="status" role="status" aria-live="polite"></div>
+      <hr />
+      <h2 id="redlibTitle"></h2>
+      <p class="muted" id="redlibIntro"></p>
+      <label class="field" for="redlib" id="redlibLabel"></label>
+      <input id="redlib" type="text" autocomplete="off" spellcheck="false" />
+      <div class="buttons">
+        <button class="primary" id="redlibSave"></button>
+      </div>
+      <div id="redlibStatus" class="status" role="status" aria-live="polite"></div>
     </main>
-    <script src="api-key.js"></script>
+    <script src="extra-settings.js"></script>
   </body>
 </html>

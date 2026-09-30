@@ -1,0 +1,325 @@
+diff --git a/content-scripts/media-site-features.js b/content-scripts/media-site-features.js
+index 00178cf..a4771fd 100644
+--- a/content-scripts/media-site-features.js
++++ b/content-scripts/media-site-features.js
+@@ -4893,7 +4893,9 @@ var mediaSiteFeatures = (function () {
+     hs = new WeakSet(),
+     fa = null,
+     ga = !1,
+-    ps = 0;
++    ps = 0,
++    kxChatEl = null,
++    kxChatRetry = null;
+   const iy = 200,
+     ly = 10;
+   function cy(e) {
+@@ -4918,15 +4920,18 @@ var mediaSiteFeatures = (function () {
+   }
+   function kc() {
+     if (Ao) return;
+-    h.debug("int-twitch", "Starting chat observation");
++    kxChatRetry && (clearTimeout(kxChatRetry), (kxChatRetry = null));
+     const e = document.querySelector(
+       '[data-test-selector="chat-scrollable-area__message-container"]',
+     );
+     if (!e) {
+-      (h.error("int-twitch", "Chat container not found"), setTimeout(kc, 1e3));
++      // Pages without a chat (home, directory, ...) are normal, so wait quietly.
++      kxChatRetry = setTimeout(kc, 1e3);
+       return;
+     }
++    h.debug("int-twitch", "Starting chat observation");
+     ((ps += 1),
++      (kxChatEl = e),
+       e
+         .querySelectorAll(
+           '.chat-line__message[data-a-target="chat-line-message"]',
+@@ -4952,8 +4957,19 @@ var mediaSiteFeatures = (function () {
+       })),
+       Ao.observe(e, { childList: !0, subtree: !0 }));
+   }
++  // Twitch is a single-page app: switching channels replaces the chat container, which leaves
++  // the message observer attached to a detached element.
++  function kxRebindChat() {
++    kxChatEl &&
++      !kxChatEl.isConnected &&
++      (h.debug("int-twitch", "Chat container replaced, restarting observation"),
++      Sc(),
++      xn && xn.autoTranslate && !ga && kc());
++  }
+   function Sc() {
+     ((ps += 1),
++      (kxChatEl = null),
++      kxChatRetry && (clearTimeout(kxChatRetry), (kxChatRetry = null)),
+       Ao &&
+         (h.debug("int-twitch", "Stopping chat observation"),
+         Ao.disconnect(),
+@@ -4963,7 +4979,15 @@ var mediaSiteFeatures = (function () {
+   }
+   function uy() {
+     var t, n;
+-    const e = document.querySelector('[data-a-target="chat-input-identity"]');
++    // data-a-user holds the login name, which Twitch also keeps in the "login" cookie; the DOM
++    // lookups below only yield the display name and their elements are often missing.
++    try {
++      const r = document.cookie.match(/(?:^|;\s*)login=([^;]+)/);
++      r && (fa = decodeURIComponent(r[1]).trim() || null);
++    } catch {}
++    const e = fa
++      ? null
++      : document.querySelector('[data-a-target="chat-input-identity"]');
+     if (
+       (e && (fa = ((t = e.textContent) == null ? void 0 : t.trim()) || null),
+       !fa)
+@@ -5012,6 +5036,7 @@ var mediaSiteFeatures = (function () {
+       !o)
+     )
+       return;
++    fa || uy();
+     const a = fa && t.toLowerCase() === fa.toLowerCase();
+     (a && !xn.translateOwn) ||
+       (da.push({ element: e, text: o, username: t, isOwnMessage: a || !1 }),
+@@ -5189,7 +5214,7 @@ var mediaSiteFeatures = (function () {
+     const e = "__arrow_svg__";
+     if (no.has(e)) return no.get(e);
+     const t = document.querySelectorAll(
+-      '.chat-settings__popover [role="menuitem"] .tw-svg svg, .chat-settings__popover [data-a-target*="menu"] .tw-svg svg',
++      ".chat-settings__popover .tw-interactable .tw-svg svg",
+     );
+     for (const o of Array.from(t)) {
+       const a = o.querySelector("path");
+@@ -5223,42 +5248,45 @@ var mediaSiteFeatures = (function () {
+   }
+   function Cc() {
+     return jt(
+-      '[data-a-target="chat-pause-menu"]',
+-      "Layout-sc-1xcs6mc-0 igZqfU",
++      "div:has(> button.tw-interactable)",
++      "Layout-sc-1xcs6mc-0 eDiLRr",
+     );
+   }
+   function Ec() {
+     return jt(
+-      '.tw-interactable[role="menuitem"]',
+-      "ScInteractableBase-sc-ofisyf-0 ScInteractableDefault-sc-ofisyf-1 CayVJ imYKMv tw-interactable",
++      "button.tw-interactable",
++      "ScInteractableBase-sc-ofisyf-0 ScInteractableDefault-sc-ofisyf-1 cQzzvm iTnOTE tw-interactable",
+     );
+   }
+   function Tc() {
+     return jt(
+       ".tw-interactable .Layout-sc-1xcs6mc-0",
+-      "Layout-sc-1xcs6mc-0 dCYttJ",
++      "Layout-sc-1xcs6mc-0 dmmLGq",
+     );
+   }
+   function Ac() {
+     return jt(
+-      '.tw-interactable [class*="dtSdDz"]',
+-      "Layout-sc-1xcs6mc-0 dtSdDz",
++      ".tw-interactable > div > div:first-child",
++      "Layout-sc-1xcs6mc-0 dmulkQ",
+     );
+   }
+   function hy() {
+-    return jt('[class*="hGDXYq"]', "Layout-sc-1xcs6mc-0 hGDXYq");
++    return jt(
++      ".tw-interactable > div > div:nth-child(2):not(:last-child)",
++      "Layout-sc-1xcs6mc-0 jwwJCN",
++    );
+   }
+   function Lc() {
+     return jt(
+-      '[class*="cWChvM"], [class*="fuLBqz"]',
+-      "Layout-sc-1xcs6mc-0 cWChvM",
++      ".tw-interactable > div > div:last-child:not(:first-child)",
++      "Layout-sc-1xcs6mc-0 exiXJA",
+     );
+   }
+   function py() {
+-    return jt('[class*="crjNOu"]', "Layout-sc-1xcs6mc-0 crjNOu");
++    return jt("div:has(> div > .tw-toggle)", "Layout-sc-1xcs6mc-0 dovCzx");
+   }
+   function my() {
+-    return jt('[class*="kvrzxX"]', "Layout-sc-1xcs6mc-0 kvrzxX");
++    return jt("div:has(> .tw-toggle)", "Layout-sc-1xcs6mc-0 bPLZqY");
+   }
+   function by() {
+     return jt(
+@@ -5301,12 +5329,33 @@ var mediaSiteFeatures = (function () {
+     );
+   }
+   function $i() {
+-    return jt('[class*="gpiLEA"]', "Layout-sc-1xcs6mc-0 gpiLEA");
++    return jt(
++      ".chat-settings__content > div > div:has(> p:only-child)",
++      "Layout-sc-1xcs6mc-0 dWlRGD",
++    );
++  }
++  function kxHeadingText() {
++    return jt(
++      ".chat-settings__content > div > div > p:only-child",
++      "CoreText-sc-1txzju1-0 ZGknp",
++    );
+   }
+   function _y() {
+     return jt(
+-      '[data-test-selector="chat-settings-back-button"]',
+-      "ScCoreButton-sc-ocjdkq-0 iPkwTD ScButtonIcon-sc-9yap0r-0 dcNXJO",
++      '[data-test-selector="chat-settings-close-button-selector"]',
++      "ScCoreButton-sc-ocjdkq-0 eBQIRH ScButtonIcon-sc-9yap0r-0 jcYIUn",
++    );
++  }
++  function kxBackFigure() {
++    return jt(
++      '[data-test-selector="chat-settings-close-button-selector"] > div',
++      "ButtonIconFigure-sc-1emm8lf-0 jgYFuA",
++    );
++  }
++  function kxBackSvg() {
++    return jt(
++      '[data-test-selector="chat-settings-close-button-selector"] .tw-svg',
++      "ScSvgWrapper-sc-wkgzod-0 cnGLHG tw-svg",
+     );
+   }
+   function xy() {
+@@ -5343,7 +5392,8 @@ var mediaSiteFeatures = (function () {
+     Mo = null,
+     Qt = null,
+     Io = null,
+-    Mc = null;
++    Mc = null,
++    kxMainTitle = null;
+   const ro = {
+     autoTranslate: !1,
+     showOriginal: !0,
+@@ -5418,6 +5468,7 @@ var mediaSiteFeatures = (function () {
+     (bs && qa(bs),
+       (bs = new MutationObserver((e) => {
+         var t, n, r;
++        kxRebindChat();
+         for (const o of e) {
+           if (o.type === "childList" && o.removedNodes.length > 0)
+             for (const a of o.removedNodes)
+@@ -5462,7 +5513,8 @@ var mediaSiteFeatures = (function () {
+                   ) ||
+                   a.querySelector('[data-a-target="hide-chat-button"]') ||
+                   a.querySelector('[data-a-target="popout-chat-button"]');
+-                a.querySelector(".chat-settings__content") &&
++                (a.querySelector(".chat-settings__content") ||
++                  a.closest(".chat-settings__content")) &&
+                   i &&
+                   (h.debug(
+                     "int-twitch",
+@@ -5522,6 +5574,10 @@ var mediaSiteFeatures = (function () {
+       h.debug("int-twitch", "Chat settings content area not found");
+       return;
+     }
++    if (r.querySelector('[data-a-target="chat-settings-mod-view"]')) {
++      h.debug("int-twitch", "In mod settings, skipping injection");
++      return;
++    }
+     if (!(
+       r.querySelector('[data-a-target="chat-pause-menu"]') ||
+       r.querySelector('[data-a-target="chat-appearance-selector"]') ||
+@@ -5531,20 +5587,12 @@ var mediaSiteFeatures = (function () {
+       h.debug("int-twitch", "Not in main menu, skipping injection");
+       return;
+     }
+-    const a = r.querySelector('[data-a-target="popout-chat-button"]');
++    const a = Array.from(r.querySelectorAll(".tw-interactable")).pop();
+     let s = null;
+-    if (
+-      (a &&
+-        ((s = a.closest(".Layout-sc-1xcs6mc-0.igZqfU")),
+-        s && s.parentElement && (s = s.parentElement)),
+-      !s)
+-    ) {
+-      const l = r.querySelector(".ScInteractableBase-sc-ofisyf-0");
+-      if (l) {
+-        const c = l.closest(".Layout-sc-1xcs6mc-0.igZqfU");
+-        c && c.parentElement && (s = c.parentElement);
+-      }
+-    }
++    a &&
++      a.parentElement &&
++      a.parentElement !== r &&
++      (s = a.parentElement.parentElement);
+     if (!s) {
+       h.debug("int-twitch", "Could not find proper insertion point");
+       return;
+@@ -5629,8 +5677,8 @@ var mediaSiteFeatures = (function () {
+       ((o.className = _y()),
+         o.setAttribute("aria-label", "Back to chat settings"),
+         (o.innerHTML = `
+-      <div class="ButtonIconFigure-sc-1emm8lf-0 lnTwMD">
+-        <div class="ScSvgWrapper-sc-wkgzod-0 kccyMt tw-svg">
++      <div class="${kxBackFigure()}">
++        <div class="${kxBackSvg()}">
+           <svg width="20" height="20" viewBox="0 0 20 20" focusable="false" aria-hidden="true" role="presentation">
+             <path d="M13.5 14.5 9 10l4.5-4.5L12 4l-6 6 6 6 1.5-1.5z"></path>
+           </svg>
+@@ -5642,8 +5690,9 @@ var mediaSiteFeatures = (function () {
+     }
+     const r = t.querySelector(".tw-title");
+     r &&
++      (kxMainTitle ?? (kxMainTitle = r.textContent),
+       (r.textContent =
+-        ve.t("twitch_translation_settings") || "Translation Settings");
++        ve.t("twitch_translation_settings") || "Translation Settings"));
+   }
+   function Py(e) {
+     var a;
+@@ -5671,9 +5720,10 @@ var mediaSiteFeatures = (function () {
+       const i = o.querySelector(".tw-title");
+       i &&
+         (i.textContent =
+-          document.documentElement.lang === "it"
++          kxMainTitle ||
++          (document.documentElement.lang === "it"
+             ? "Impostazioni chat"
+-            : "Chat Settings");
++            : "Chat Settings"));
+     }
+     requestAnimationFrame(() => {
+       ha();
+@@ -5688,7 +5738,7 @@ var mediaSiteFeatures = (function () {
+     r.className = ms();
+     const o = document.createElement("div");
+     ((o.className = $i()),
+-      (o.innerHTML = `<p class="CoreText-sc-1txzju1-0 yIWOC">${ve.t("twitch_translation_options") || "Translation Options"}</p>`),
++      (o.innerHTML = `<p class="${kxHeadingText()}">${ve.t("twitch_translation_options") || "Translation Options"}</p>`),
+       r.appendChild(o));
+     const a = Di(
+       "auto-translate",
+@@ -5870,6 +5920,13 @@ var mediaSiteFeatures = (function () {
+       l.setAttribute("maxlength", "65"),
+       (l.style.width = "100%"),
+       (l.style.borderRadius = "4px"),
++      (l.style.boxSizing = "border-box"),
++      (l.style.padding = "5px 10px"),
++      (l.style.font = "inherit"),
++      (l.style.color = "var(--color-text-input, inherit)"),
++      (l.style.background = "var(--color-background-input, transparent)"),
++      (l.style.border =
++        "1px solid var(--color-border-input, rgba(83, 83, 95, 0.48))"),
+       i.appendChild(l),
+       s.appendChild(i),
+       a.appendChild(s),
+@@ -5906,14 +5963,14 @@ var mediaSiteFeatures = (function () {
+           if (v.isMostUsed && !m) {
+             const w = document.createElement("div");
+             ((w.className = $i()),
+-              (w.innerHTML = `<p class="CoreText-sc-1txzju1-0 yIWOC">${ve.t("most_used_languages") || "Most Used"}</p>`),
++              (w.innerHTML = `<p class="${kxHeadingText()}">${ve.t("most_used_languages") || "Most Used"}</p>`),
+               c.appendChild(w),
+               (m = !0));
+           } else if (!v.isMostUsed && !b) {
+             const w = document.createElement("div");
+             ((w.className = $i()),
+               (w.style.marginTop = "16px"),
+-              (w.innerHTML = `<p class="CoreText-sc-1txzju1-0 yIWOC">${ve.t("all_languages") || "All Languages"}</p>`),
++              (w.innerHTML = `<p class="${kxHeadingText()}">${ve.t("all_languages") || "All Languages"}</p>`),
+               c.appendChild(w),
+               (b = !0));
+           }
