@@ -36,7 +36,7 @@
       display: {
         containerSelector: descriptions,
         position: "prepend",
-        // Needs patch 0004.
+        // Needs patch 0004
         colorScheme: "light",
         components: {
           sourceLanguageSelector: { container: { styles: { width: "180px" } } },
