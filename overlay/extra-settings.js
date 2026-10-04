@@ -1,5 +1,4 @@
-// Settings page for API-key authentication and Redlib instances. Standalone on purpose: it does not depend on the
-// upstream bundles, so it keeps working when Kagi ships a new build.
+// Standalone on purpose: it does not depend on the upstream bundles.
 const ext = globalThis.browser ?? globalThis.chrome;
 const KEY = "kagi_api_key";
 const MODE = "kagi_auth_mode"; // "api_key" = use the key only; anything else = Kagi session (default)
@@ -80,7 +79,6 @@ $("clear").addEventListener("click", async () => {
 });
 load();
 
-// Redlib instances: the Reddit integration also runs on these hosts (read by the content scripts).
 const REDLIB = "kagi_redlib_domains";
 const r = {
   title: "Redlib instances",
@@ -96,7 +94,6 @@ $("redlibLabel").textContent = r.label;
 $("redlib").placeholder = r.placeholder;
 $("redlibSave").textContent = r.save;
 
-// Accepts bare hosts as well as pasted URLs.
 function parseDomains(text) {
   const hosts = [];
   for (const part of text.split(/[\s,]+/)) {

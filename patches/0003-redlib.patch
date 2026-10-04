@@ -1,5 +1,5 @@
 diff --git a/content-scripts/content.js b/content-scripts/content.js
-index 6a0a528..dafb644 100644
+index 6a0a528..1d9d697 100644
 --- a/content-scripts/content.js
 +++ b/content-scripts/content.js
 @@ -670,7 +670,8 @@ var content = (function () {
@@ -12,11 +12,10 @@ index 6a0a528..dafb644 100644
      Lt = "data-kagi-translate-roundcube-global",
      vt = "kagi-translate-roundcube-probe-found",
      Ie = "kagi-translate-roundcube-probe-stop",
-@@ -905,9 +906,14 @@ var content = (function () {
+@@ -905,9 +906,13 @@ var content = (function () {
          ? "kagi_translate_bluesky_integration"
          : (((e = Ye.find(([n]) => it(t, n))) == null ? void 0 : e[1]) ?? null);
    }
-+  // Redlib is self-hosted, so its hosts come from a user-maintained list (overlay/extra-settings.html).
 +  function kxIsRedlib(t, e) {
 +    return Array.isArray(e) && e.some((n) => typeof n == "string" && Pt(t, n));
 +  }
@@ -30,7 +29,7 @@ index 6a0a528..dafb644 100644
        const r = e[o];
        return r === void 0 || r === "true";
 diff --git a/content-scripts/site-features.js b/content-scripts/site-features.js
-index a47b291..a57a807 100644
+index a47b291..85517d6 100644
 --- a/content-scripts/site-features.js
 +++ b/content-scripts/site-features.js
 @@ -39827,6 +39827,7 @@ ${f.join(`
@@ -41,7 +40,7 @@ index a47b291..a57a807 100644
          L
        );
      }
-@@ -40460,6 +40461,104 @@ ${f.join(`
+@@ -40460,6 +40461,101 @@ ${f.join(`
        }
      }
    }
@@ -52,9 +51,7 @@ index a47b291..a57a807 100644
 +    const t = document.querySelector("#post_links");
 +    return t ? t.closest(".post") : null;
 +  }
-+  // .post is a grid with named areas, so the panel needs a full-width row of its own. The panel
-+  // host cannot be styled from the page (its shadow root resets it with !important), hence the
-+  // wrapper.
++  // .post is a grid and the panel host resets its own styles, so a wrapper spans the row.
 +  function kxRedlibPanel() {
 +    const t = kxRedlibPost();
 +    if (!t) return null;
@@ -103,7 +100,6 @@ index a47b291..a57a807 100644
 +    const n = e.querySelector("[data-kagi-redlib-title]");
 +    if (n) return n;
 +    if (e.childElementCount === 0) return e;
-+    // The title shares its <h1> with the flair link, so only the text itself gets wrapped.
 +    const r = Array.from(e.childNodes)
 +      .filter((a) => a.nodeType === 3 && a.textContent.trim())
 +      .sort((a, s) => s.textContent.length - a.textContent.length)[0];
@@ -146,7 +142,7 @@ index a47b291..a57a807 100644
    function n4() {
      (g.info("int-reddit", "Initializing Reddit integration"),
        jt(() => {
-@@ -40537,7 +40636,7 @@ ${f.join(`
+@@ -40537,7 +40633,7 @@ ${f.join(`
        return;
      }
      if (!document.querySelector(".title.may-blank")) {
@@ -155,7 +151,7 @@ index a47b291..a57a807 100644
        return;
      }
      const e =
-@@ -41002,7 +41101,7 @@ ${f.join(`
+@@ -41002,7 +41098,7 @@ ${f.join(`
      const e = document.querySelector("shreddit-post");
      if (e) return e;
      const n = document.querySelector(".thing.link");
@@ -164,7 +160,7 @@ index a47b291..a57a807 100644
    }
    function v4(t, e, n, r) {
      if (
-@@ -41500,7 +41599,7 @@ ${f.join(`
+@@ -41500,7 +41596,7 @@ ${f.join(`
        rr("kagi-redirect", k4);
        return;
      }
@@ -173,7 +169,7 @@ index a47b291..a57a807 100644
        {
          kagi_translate_bluesky_integration: r,
          kagi_translate_twitter_integration: o,
-@@ -41592,7 +41691,7 @@ ${f.join(`
+@@ -41592,7 +41688,7 @@ ${f.join(`
            "Telegram Web detected, initializing Telegram integration",
          ),
          rr("telegram", NI)),

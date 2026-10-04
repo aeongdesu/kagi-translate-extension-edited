@@ -1,0 +1,131 @@
+diff --git a/content-scripts/site-features.js b/content-scripts/site-features.js
+index 85517d6..8f5003d 100644
+--- a/content-scripts/site-features.js
++++ b/content-scripts/site-features.js
+@@ -7034,14 +7034,19 @@ var siteFeatures = (function () {
+   function $k(t) {
+     return t.themeDetection ? Dc(t.themeDetection) === "dark" : !1;
+   }
++  function kxQuery(t, e) {
++    const n = t.querySelectorAll(e);
++    for (const r of n) if (r.getClientRects().length) return r;
++    return n[0] ?? null;
++  }
+   function Xp(t, e, n) {
+     switch (e.relativeTo) {
+       case "container":
+         return t;
+       case "text":
+-        return (n ? t.querySelector(n) : null) ?? t;
++        return (n ? kxQuery(t, n) : null) ?? t;
+       case "selector":
+-        return (e.selector ? t.querySelector(e.selector) : null) ?? t;
++        return (e.selector ? kxQuery(t, e.selector) : null) ?? t;
+     }
+   }
+   function Jp(t, e, n) {
+@@ -10232,31 +10237,44 @@ var siteFeatures = (function () {
+         ze = (ne == null ? void 0 : ne.dataset.containerType) === "embedded",
+         N = U.getBoundingClientRect();
+       let fe = N.left,
+-        se = N.bottom;
++        se = N.bottom,
++        kxPortal = null;
+       if (ze) {
+         const st = [
+           "kagi-translate-bluesky-translation",
+           "kagi-translate-twitter-translation",
+           "kagi-translate-embedded",
+         ];
++        let kxFound = !1;
+         for (const En of st) {
+           const nt = document.querySelector(En);
+           if (nt && nt.shadowRoot) {
+             const Me = nt.getBoundingClientRect();
+-            ((fe = N.left - Me.left), (se = N.bottom - Me.top));
++            ((fe = N.left - Me.left), (se = N.bottom - Me.top), (kxFound = !0));
+             break;
+           }
+         }
++        // Custom integration hosts are not listed; measure against the portal container.
++        kxFound ||
++          ((kxPortal = ne.getBoundingClientRect()),
++          (fe = N.left - kxPortal.left),
++          (se = N.bottom - kxPortal.top));
+       }
+       const Ie = 400,
+         lt = window.innerHeight - N.bottom,
+         Pe = N.top;
+-      (x(L, lt < Ie && Pe > lt, !0), c(L) && (se = N.top));
+-      const bt = Math.max(N.width, 300),
+-        Lt = fe + bt,
++      // The style sets `bottom: innerHeight - y`, which is relative to the portal here.
++      (x(L, lt < Ie && Pe > lt, !0),
++        c(L) &&
++          (se = kxPortal
++            ? window.innerHeight - kxPortal.height + (N.top - kxPortal.top)
++            : N.top));
++      const kxLeft = kxPortal ? kxPortal.left : 0,
++        bt = Math.max(N.width, 300),
++        Lt = fe + kxLeft + bt,
+         Xt = window.innerWidth,
+         ln = 8;
+-      (Lt > Xt - ln && (fe = Math.max(ln, Xt - bt - ln)),
++      (Lt > Xt - ln && (fe = Math.max(ln, Xt - bt - ln) - kxLeft),
+         x(A, { x: fe, y: se, width: bt }, !0));
+     }
+     let Oe = null;
+@@ -23084,6 +23102,7 @@ registerProcessor("pcm-processor", PCMProcessor);
+       var lt, Pe;
+       if (
+         N.hasAttribute("data-kagi-translated") ||
++        (fe.onlyVisible && !N.getClientRects().length) ||
+         ((lt = fe.excludeSelectors) != null && lt.some((bt) => N.matches(bt)))
+       )
+         return null;
+@@ -23729,13 +23748,20 @@ registerProcessor("pcm-processor", PCMProcessor);
+       const N = window.matchMedia("(prefers-color-scheme: dark)");
+       return (
+         N.addEventListener("change", pn),
+-        St(),
++        ir.load().then((kx) => {
++          x(p, kx.defaultTargetLanguage || fr(), !0);
++          St();
++        }),
+         () => {
+           N.removeEventListener("change", pn);
+         }
+       );
+     });
+     function Jt() {
++      var kx;
++      const kxScheme = (kx = e.displayConfig) == null ? void 0 : kx.colorScheme;
++      if (kxScheme === "light" || kxScheme === "dark")
++        return kxScheme === "dark";
+       const N = document.documentElement;
+       return N.classList.contains("dark") ||
+         N.getAttribute("data-theme") === "dark" ||
+@@ -23744,7 +23770,13 @@ registerProcessor("pcm-processor", PCMProcessor);
+         : window.matchMedia("(prefers-color-scheme: dark)").matches;
+     }
+     function pn(N) {
+-      x(w, N.matches || Jt(), !0);
++      var kx;
++      x(
++        w,
++        ((kx = e.displayConfig) != null && kx.colorScheme ? !1 : N.matches) ||
++          Jt(),
++        !0,
++      );
+     }
+     let Ae = ee(() => {
+       var N;
+@@ -25667,7 +25699,7 @@ registerProcessor("pcm-processor", PCMProcessor);
+     if (Gs(t) !== o || !zr(u)) return;
+     let f = u;
+     if (s != null && s.containerSelector) {
+-      const w = u.querySelector(s.containerSelector);
++      const w = kxQuery(u, s.containerSelector);
+       w && (f = w);
+     }
+     const m = `custom-translation-${Date.now()}-${Math.random().toString(36).substring(2, 9)}`,

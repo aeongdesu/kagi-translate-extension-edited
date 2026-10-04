@@ -22,6 +22,8 @@
       hr { border: 0; border-top: 1px solid var(--line); margin: 32px 0 24px; }
       h2 { font-size: 17px; margin: 0 0 4px; }
       label.field { display: block; margin: 16px 0 6px; }
+      .integration label.row { margin: 16px 0 0; }
+      .integration p.muted { margin: 2px 0 0 26px; font-size: 14px; }
     </style>
   </head>
   <body>
@@ -48,7 +50,13 @@
         <button class="primary" id="redlibSave"></button>
       </div>
       <div id="redlibStatus" class="status" role="status" aria-live="polite"></div>
+      <hr />
+      <h2 id="customTitle"></h2>
+      <p class="muted" id="customIntro"></p>
+      <div id="customList"></div>
+      <div id="customStatus" class="status" role="status" aria-live="polite"></div>
     </main>
     <script src="extra-settings.js"></script>
+    <script src="custom-integrations/settings.js"></script>
   </body>
 </html>
