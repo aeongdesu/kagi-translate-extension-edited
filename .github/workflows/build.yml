@@ -1,18 +1,14 @@
 name: Build patched extension
 on:
   workflow_dispatch:
-    inputs:
-      url:
-        description: "use chrome webstore for latest"
-        required: true
-        type: string
 
 permissions:
   contents: read
 
 env:
-  # Patches are written against the output of this exact Prettier version. Do not change it without regenerating the patches.
+  # Patches are written against the output of this exact Prettier version. !!Do not change it without regenerating the patches!!
   PRETTIER_VERSION: 3.9.9
+  EXTENSION_DIRECT: ${{ vars.EXTENSION_DIRECT }}
 
 jobs:
   build:
@@ -27,9 +23,9 @@ jobs:
       - name: Download original extension
         run: |
           set -euo pipefail
-          [[ "${{ inputs.url }}" == https://* ]] || { echo "::error::The link must start with https://"; exit 1; }
+          [[ $EXTENSION_DIRECT == https://* ]] || { echo "::error::The link must start with https://"; exit 1; }
           mkdir -p "$RUNNER_TEMP/work"
-          curl -fsSL --max-time 120 -o "$RUNNER_TEMP/work/kagi.crx" -- "${{ inputs.url }}"
+          curl -fsSL -o "$RUNNER_TEMP/work/kagi.crx" -- $EXTENSION_DIRECT
 
       - name: Unpack
         run: |
@@ -37,7 +33,7 @@ jobs:
           cd "$RUNNER_TEMP/work"
           unzip -q kagi.crx -d base || [ $? -eq 1 ]
           jq -e '.name == "Kagi Translate" and .manifest_version == 3' base/manifest.json >/dev/null \
-            || { echo "::error::Not the Chrome (MV3) build of Kagi Translate"; exit 1; }
+            || { echo "::error::Not the Chrome (MV3) build of Kagi Translate!"; exit 1; }
           rm -rf base/_metadata # the Web Store signature is invalid once files change
 
       - name: Format
