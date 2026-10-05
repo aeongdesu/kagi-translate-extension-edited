@@ -1,0 +1,98 @@
+diff --git a/content-scripts/site-features.js b/content-scripts/site-features.js
+index 8f5003d..d461953 100644
+--- a/content-scripts/site-features.js
++++ b/content-scripts/site-features.js
+@@ -17296,6 +17296,61 @@ registerProcessor("pcm-processor", PCMProcessor);
+         : { snippets: [], error: `Translation failed: ${u}`, code: "error" };
+     }
+   }
++  // The API rejects a request whose text exceeds 20000 code points, so a long thread
++  // is sent in size-limited batches (limit kept lower as the exact counting is unknown).
++  const kxChunkLimit = 15e3;
++  function kxSplitText(t, e) {
++    const n = Array.from(t),
++      r = [];
++    let o = 0;
++    for (; n.length - o > e; ) {
++      let a = o + e;
++      for (let s = a; s > o + (e >> 1); s--)
++        if (/[\n.!?。！？]/.test(n[s - 1])) {
++          a = s;
++          break;
++        }
++      (r.push(n.slice(o, a).join("")), (o = a));
++    }
++    return (r.push(n.slice(o).join("")), r);
++  }
++  async function kxTranslateChunked(t, e, n, r, o) {
++    const a = [];
++    t.forEach((c, d) => {
++      kxSplitText(c, kxChunkLimit).forEach((u) => {
++        a.push({ owner: d, text: u, size: Array.from(u).length });
++      });
++    });
++    const s = [];
++    let i = [],
++      l = 0;
++    for (const c of a)
++      (i.length && l + c.size > kxChunkLimit && (s.push(i), (i = []), (l = 0)),
++        i.push(c),
++        (l += c.size));
++    i.length && s.push(i);
++    const u = t.map(() => []);
++    let d;
++    for (const c of s) {
++      const f = await Tl(
++        c.map((m) => m.text),
++        e,
++        n,
++        r,
++      );
++      if (f.error) return f;
++      (d || (d = f.detectedLanguage),
++        c.forEach((m, p) => u[m.owner].push(f.snippets[p])),
++        o && o(c[c.length - 1].owner + 1));
++    }
++    return {
++      snippets: u.map((c) => {
++        const f = c.filter(Boolean);
++        return f.length ? f.join(" ") : void 0;
++      }),
++      detectedLanguage: d,
++    };
++  }
+   async function o2(t, e, n) {
+     try {
+       g.debug("net", "Starting streaming translation request");
+@@ -39918,11 +39973,17 @@ ${f.join(`
+         }
+         x(i, { completed: 0, total: Q.length }, !0);
+         const Z = w(V),
+-          z = await Tl(Q, c(p), c(b), {
+-            model: "standard",
+-            extensionContext: "integration-reddit",
+-            context: Z,
+-          });
++          z = await kxTranslateChunked(
++            Q,
++            c(p),
++            c(b),
++            {
++              model: "standard",
++              extensionContext: "integration-reddit",
++              context: Z,
++            },
++            (ue) => x(i, { completed: ue, total: Q.length }, !0),
++          );
+         if (z.error) {
+           (g.error("int-reddit", "Translation failed", z.error),
+             x(a, !0),
+@@ -40087,7 +40148,7 @@ ${f.join(`
+       }).filter((ce) => !!ce && ce.length > 0);
+       if (de.length !== 0)
+         try {
+-          const ce = await Tl(de, c(p), c(b), {
++          const ce = await kxTranslateChunked(de, c(p), c(b), {
+             model: "standard",
+             extensionContext: "integration-reddit",
+             context: z,
